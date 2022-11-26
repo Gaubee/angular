@@ -1010,6 +1010,65 @@ export class TemplateDefinitionBuilder implements t.Visitor<void>, LocalResolver
     } else {
       error('Text nodes should be interpolated and never bound directly.');
     }
+    // #region @gaubee
+    const addI18nLocalize = (args: AST[]) => {
+      let i18n_meta_and_text = '';
+      // const messageParts: o.LiteralPiece[] = [];
+      // const placeHolders: o.PlaceholderPiece[] = [];
+      // const expressions: o.Expression[] = [];
+      // let sourceSpan: ParseSourceSpan | null = null;
+
+      const template_string_elements: o.TemplateLiteralElement[] = [];
+      const template_string_expressions: o.Expression[] = [];
+      if (args.length !== 1) {
+        error('$localize in interpolation only support single argument.');
+      }
+      for (const arg of args) {
+        const convertedPropertyBinding = convertPropertyBinding(
+            this, this.getImplicitReceiverExpr(), arg, this.bindingContext());
+        const currValExpr = convertedPropertyBinding.currValExpr;
+        if (currValExpr instanceof o.LiteralExpr && typeof currValExpr.value === 'string') {
+          // messageParts.push(messageParts)
+          template_string_elements.push(new o.TemplateLiteralElement(
+              currValExpr.value, currValExpr.sourceSpan ?? undefined, undefined));
+          i18n_meta_and_text += currValExpr.value;
+        } else {
+          // template_string_expressions.push(currValExpr);
+          error('in interpolation, $localize\'s argument must by string literal.');
+        }
+      }
+
+      // const i18n_meta = i18n_meta_and_text.match(/^:(.*?):/)?.[1] ?? '';
+      // const i18n_text = i18n_meta_and_text.match(/^:.*?:(.*)/)?.[1] ?? i18n_meta_and_text;
+      // const message = parseI18nMeta(i18n_meta);
+
+      // const localizedString = o.localizedString(
+      //   message,
+      //   messageParts,
+      //   placeHolders,
+      //   expressions,
+      //   sourceSpan
+      // );
+      const taggedTemplate = o.taggedTemplate(
+          new o.ReadVarExpr('$localize', o.FUNCTION_TYPE, null),
+          new o.TemplateLiteral(template_string_elements, template_string_expressions));
+
+      const saveLocalizeToGlobal = new o.WriteVarExpr(
+          `$localize.trans[${JSON.stringify(i18n_meta_and_text)}]`, taggedTemplate, null);
+
+      this._constants.prepareStatements.push(new o.ExpressionStatement(saveLocalizeToGlobal));
+    };
+    class I18nConverter extends AstMemoryEfficientTransformer {
+      override visitCall(ast: Call, context: any) {
+        if (ast.receiver instanceof PropertyRead && ast.receiver.name === '$localize') {
+          addI18nLocalize(ast.args);
+        }
+        return super.visitCall(ast, context);
+      }
+    }
+    text.value.visit(new I18nConverter());
+
+    // #endregion
   }
 
   visitText(text: t.Text) {
