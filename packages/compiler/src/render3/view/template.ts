@@ -1056,7 +1056,7 @@ export class TemplateDefinitionBuilder implements t.Visitor<void>, LocalResolver
       const saveLocalizeToGlobal = new o.WriteVarExpr(
           `$localize.trans[${JSON.stringify(i18n_meta_and_text)}]`, taggedTemplate, null);
 
-      this._constants.prepareStatements.push(new o.ExpressionStatement(saveLocalizeToGlobal));
+      this._constants.constExpressions.push(saveLocalizeToGlobal);
     };
     class I18nConverter extends AstMemoryEfficientTransformer {
       override visitCall(ast: Call, context: any) {
